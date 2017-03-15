@@ -1263,6 +1263,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
           angular.extend(translationTable, flatObject(data));
         }
         pendingLoader = false;
+        translations(key, translationTable);
         deferred.resolve({
           key : key,
           table : translationTable
@@ -1324,7 +1325,6 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
         deferred.resolve($translationTable[langKey]);
       } else if (langPromises[langKey]) {
         var onResolve = function (data) {
-          translations(data.key, data.table);
           deferred.resolve(data.table);
         };
         onResolve.displayName = 'translationTableResolver';
@@ -1681,10 +1681,7 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
 
     var loadTranslationsIfMissing = function (key) {
       if (!$translationTable[key] && $loaderFactory && !langPromises[key]) {
-        langPromises[key] = loadAsync(key).then(function (translation) {
-          translations(translation.key, translation.table);
-          return translation;
-        });
+        langPromises[key] = loadAsync(key);
       }
     };
 
@@ -1894,7 +1891,6 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
       $nextLang = key;
       if (($forceAsyncReloadEnabled || !$translationTable[key]) && $loaderFactory && !langPromises[key]) {
         langPromises[key] = loadAsync(key).then(function (translation) {
-          translations(translation.key, translation.table);
           deferred.resolve(translation.key);
           if ($nextLang === key) {
             useLanguage(translation.key);
@@ -2044,15 +2040,13 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
 
       //private helper
       function loadNewData(languageKey) {
+        //clear the cache for this language
+        $translationTable[languageKey] = {};
         var promise = loadAsync(languageKey);
         //update the load promise cache for this language
         langPromises[languageKey] = promise;
         //register a data handler for the promise
-        promise.then(function (data) {
-            //clear the cache for this language
-            $translationTable[languageKey] = {};
-            //add the new data for this language
-            translations(languageKey, data.table);
+        promise.then(function () {
             //track that we updated this language
             updatedLanguages[languageKey] = true;
           },
@@ -2361,7 +2355,6 @@ function $translate($STORAGE_KEY, $windowProvider, $translateSanitizationProvide
       // loading them asynchronously as soon as we can.
       if ($fallbackLanguage && $fallbackLanguage.length) {
         var processAsyncResult = function (translation) {
-          translations(translation.key, translation.table);
           $rootScope.$emit('$translateChangeEnd', {language : translation.key});
           return translation;
         };
